@@ -1,11 +1,12 @@
+from typing import Callable, Any
+from docx.enum.dml import MSO_COLOR_TYPE
+from docx.text.run import Run
 import io
 from importlib import resources
 
-from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
-from docx.styles.style import CharacterStyle
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.text.paragraph import Paragraph
 from docx import Document
-from docx.table import Table
 
 from django.http import HttpResponse
 from django.utils import translation
@@ -15,16 +16,53 @@ from rdmo.projects.exports import Export
 import rdmo_docx_export.exports.templates as templates
 
 
+class Style:
+    def __init__(self, run: Run):
+        self.style = run.style
+        self.font = run.font.name
+        self.color = run.font.color
+        self.size = run.font.size
+        self.shadow = run.font.shadow
+        self.highlight = run.font.highlight_color
+        self.outline = run.font.outline
+
+    def apply(self, run: Run) -> Run:
+        run.style.base_style = self.style.base_style
+        run.style.style_id = self.style.style_id
+
+        run.font.name = self.font
+        if self.color.type == MSO_COLOR_TYPE.RGB:
+            run.font.color.rgb = self.color.rgb
+        elif self.color.type == MSO_COLOR_TYPE.THEME:
+            run.font.color.theme_color = self.color.theme_color
+        run.font.highlight_color = self.highlight
+        run.font.size = self.size
+        run.font.shadow = self.shadow
+        run.font.outline = self.outline
+
+        return run
+
+
+_Replacements = dict[str, str|Callable[['_Context', Paragraph],None]]
+
+class _Context(object):
+    def __init__(self):
+        self.datasets: Any = None
+        self.funders: Any = None
+        self.partners: Any = None
+        self.replacements: _Replacements = {}
+
 class HorizonEuropeDocxExport(Export):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _a1a(self, datasets, para: Paragraph):
+    def _a1a(self, context: _Context, para: Paragraph):
         para.text = ""
         para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         first = True
-        for data in datasets:
+        for data in context.datasets:
             if not first:
                 para.add_run("\n\n")
             first = False
@@ -34,19 +72,49 @@ class HorizonEuropeDocxExport(Export):
             headline = para.add_run(f"Dataset {data.value}")
             headline.italic = True
             headline.add_break()
-            para.add_run(f"This dataset is {origin.value.lower()}.").add_break()
+            para.add_run(f"This dataset is {origin.value.lower()}.\n")
             para.add_run(self.get_text("project/dataset/usage_description", set_index=data.set_index))
 
-    def render(self):
 
+    def _replace_paragraph_contents(self, context: _Context, para: Paragraph):
+        """
+        Checks if a paragraph's content is to be replaced.
+
+        If yes: Replaces contents. Tries to keep style intact.
+
+        Functional Style elements (i.e. italic, bold) may be applied by content
+        functions and will not be overwritten afterwards.
+        Then some style elements are not yet copied correctly (Shadow, Outline, Theme).
+        They are not readable/writable with python-docx, but we need to
+        create 'runs' to apply functional style.
+        """
+        if para.text.startswith("{{") and para.text.endswith("}}"):
+            if para.text in context.replacements:
+                value = context.replacements[para.text]
+                if isinstance(value, str):
+                    for run in para.runs:
+                        run.text = ""
+                    para.runs[0].text = value
+                else:
+                    style = Style(para.runs[0])
+                    value(context, para)
+                    for run in para.runs:
+                        style.apply(run)
+            else:
+                for run in para.runs:
+                    run.text = ""
+                para.runs[0].text = "Lorem Ipsum..."
+
+    def render(self):
+        context = _Context()
         template = resources.files(templates) / "horizon-template.docx"
         doc = Document(template.open("rb"))
         with translation.override("en"):
-            datasets = self.get_set("project/dataset/id")
-            partners = self.get_set("project/partner/id")
-            funders = self.get_set("project/funder/id")
+            context.datasets = self.get_set("project/dataset/id")
+            context.partners = self.get_set("project/partner/id")
+            context.funders = self.get_set("project/funder/id")
 
-            replacements = {
+            context.replacements = {
                 "{{projectnumber}}": self.get_text("project/funder/grant_nr"),
                 "{{projectacronym}}": self.get_text("project/acronym"),
                 "{{projecttitle}}": self.get_text("project/title"),
@@ -56,27 +124,12 @@ class HorizonEuropeDocxExport(Export):
             }
 
             for para in doc.paragraphs:
-                if para.text.startswith("{{") and para.text.endswith("}}"):
-                    if para.text in replacements:
-                        if isinstance(replacements[para.text], str):
-                            para.text = replacements[para.text]
-                        else:
-                            replacements[para.text](datasets, para)
-                    else:
-                        para.text = "Lorem Ipsum..."
-
+                self._replace_paragraph_contents(context, para)
             for tab in doc.tables:
                 for c in tab.columns:
                     for cell in c.cells:
-                        if cell.text.startswith("{{") and cell.text.endswith("}}"):
-                            print(f"Found template section {cell.text} in table")
-                            if cell.text in replacements and replacements[cell.text] is not None:
-                                if isinstance(replacements[cell.text], str):
-                                    cell.text = replacements[cell.text]
-                                else:
-                                    replacements[cell.text](datasets, cell)
-                            else:
-                                cell.text = "Lorem Ipsum..."
+                        for para in cell.paragraphs:
+                            self._replace_paragraph_contents(context, para)
 
         response_data = io.BytesIO()
         doc.save(response_data)
