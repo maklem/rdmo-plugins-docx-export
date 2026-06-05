@@ -62,19 +62,58 @@ class HorizonEuropeDocxExport(Export):
         para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         first = True
-        for data in context.datasets:
+        for dataset in context.datasets:
             if not first:
                 para.add_run("\n\n")
             first = False
 
-            origin = self.get_value("project/dataset/origin", set_index=data.set_index)
+            origin = self.get_value("project/dataset/origin", set_index=dataset.set_index)
 
-            headline = para.add_run(f"Dataset {data.value}")
+            headline = para.add_run(f"Dataset {dataset.value}")
             headline.italic = True
             headline.add_break()
-            para.add_run(f"This dataset is {origin.value.lower()}.\n")
-            para.add_run(self.get_text("project/dataset/usage_description", set_index=data.set_index))
+            para.add_run(f"This dataset is {origin.value.lower().replace('both (', '').replace(')','')}.\n")
+            para.add_run(self.get_text("project/dataset/usage_description", set_index=dataset.set_index))
 
+    def _a1b(self, context: _Context, para: Paragraph):
+        para.text = ""
+        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+        first = True
+        for dataset in context.datasets:
+            existing = self.get_value("project/dataset/reuse_existing", set_index=dataset.set_index)
+
+            if existing and existing.value:  # if value exists and is not empty
+                if not first:
+                    para.add_run("\n\n")
+                first = False
+
+                headline = para.add_run(f"Dataset {dataset.value}:")
+                headline.italic = True
+                para.add_run(existing.value)
+
+    def _a2(self, context: _Context, para: Paragraph):
+        para.text = ""
+        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+        first = True
+        for dataset in context.datasets:
+            description = self.get_value("project/dataset/description", set_index=dataset.set_index)
+            format = self.get_value("project/dataset/format", set_index=dataset.set_index)
+
+            if description or format:
+                if not first:
+                    para.add_run("\n\n")
+                first = False
+
+                headline = para.add_run(f"Dataset {dataset.value}:\n")
+                headline.italic = True
+            if description:
+                para.add_run("The data are ")
+                para.add_run(description.value).add_break()
+            if format:
+                para.add_run("They are provided in the following formats: ")
+                para.add_run(format.value)
 
     def _replace_paragraph_contents(self, context: _Context, para: Paragraph):
         """
@@ -121,6 +160,8 @@ class HorizonEuropeDocxExport(Export):
                 "{{dmpdate}}": self.get_text("project/dmp/dmp_date"),
                 "{{dmpversion}}": self.get_text("project/dmp/dmp_version"),
                 "{{Answer1a}}": self._a1a,
+                "{{Answer1b}}": self._a1b,
+                "{{Answer2}}": self._a2,
             }
 
             for para in doc.paragraphs:
