@@ -43,7 +43,7 @@ class Style:
         return run
 
 
-_Replacements = dict[str, str|Callable[['_Context', Paragraph],None]]
+_Replacements = dict[str, str|Callable[['_Context', Paragraph],None]|None]
 
 class _Context(object):
     def __init__(self):
@@ -127,22 +127,26 @@ class HorizonEuropeDocxExport(Export):
         They are not readable/writable with python-docx, but we need to
         create 'runs' to apply functional style.
         """
+        def replace_para(para, text):
+            for run in para.runs:
+                run.text = ""
+            para.runs[0].text = text
+
+
         if para.text.startswith("{{") and para.text.endswith("}}"):
             if para.text in context.replacements:
                 value = context.replacements[para.text]
-                if isinstance(value, str):
-                    for run in para.runs:
-                        run.text = ""
-                    para.runs[0].text = value
+                if value is None:
+                    replace_para(para, "***error: value not defined***")
+                elif isinstance(value, str):
+                    replace_para(para,value)
                 else:
                     style = Style(para.runs[0])
                     value(context, para)
                     for run in para.runs:
                         style.apply(run)
             else:
-                for run in para.runs:
-                    run.text = ""
-                para.runs[0].text = "Lorem Ipsum..."
+                replace_para(para, "Lorem Ipsum... ***replacement sequence not defined***")
 
     def render(self):
         context = _Context()
