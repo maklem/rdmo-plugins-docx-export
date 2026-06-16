@@ -1,9 +1,10 @@
-from typing import Callable, Any
+from collections.abc import Callable
+from importlib import resources
+import io
+from typing import Any
+
 from docx.enum.dml import MSO_COLOR_TYPE
 from docx.text.run import Run
-import io
-from importlib import resources
-
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.text.paragraph import Paragraph
 from docx import Document
@@ -23,9 +24,13 @@ class Style:
         self.color = run.font.color
         self.size = run.font.size
         self.shadow = run.font.shadow
-        self.highlight = run.font.highlight_color
         self.outline = run.font.outline
 
+        try:
+            self.highlight = run.font.highlight_color
+        except ValueError:
+            self.highlight = None
+            
     def apply(self, run: Run) -> Run:
         run.style.base_style = self.style.base_style
         run.style.style_id = self.style.style_id
@@ -35,7 +40,9 @@ class Style:
             run.font.color.rgb = self.color.rgb
         elif self.color.type == MSO_COLOR_TYPE.THEME:
             run.font.color.theme_color = self.color.theme_color
-        run.font.highlight_color = self.highlight
+        
+        if self.highlight is not None:
+            run.font.highlight_color = self.highlight
         run.font.size = self.size
         run.font.shadow = self.shadow
         run.font.outline = self.outline
@@ -43,24 +50,25 @@ class Style:
         return run
 
 
-_Replacements = dict[str, str|Callable[['_Context', Paragraph],None]|None]
 
 class _Context(object):
     def __init__(self):
         self.datasets: Any = None
         self.funders: Any = None
         self.partners: Any = None
-        self.replacements: _Replacements = {}
+
+_ParagraphFunction = Callable[['_Context', Paragraph],None]
+_Replacements = dict[str, str|_ParagraphFunction|None]
 
 class HorizonEuropeDocxExport(Export):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _a1a(self, context: _Context, para: Paragraph):
-        para.text = ""
-        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    def _stub(self, context: _Context, para: Paragraph) -> None:
+        para.add_run("Stub Text. This is not implemented yet.")
 
+    def _a1a(self, context: _Context, para: Paragraph) -> None:
         first = True
         for dataset in context.datasets:
             if not first:
@@ -75,10 +83,7 @@ class HorizonEuropeDocxExport(Export):
             para.add_run(f"This dataset is {origin.value.lower().replace('both (', '').replace(')','')}.\n")
             para.add_run(self.get_text("project/dataset/usage_description", set_index=dataset.set_index))
 
-    def _a1b(self, context: _Context, para: Paragraph):
-        para.text = ""
-        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
+    def _a1b(self, context: _Context, para: Paragraph) -> None:
         first = True
         for dataset in context.datasets:
             existing = self.get_value("project/dataset/reuse_existing", set_index=dataset.set_index)
@@ -92,10 +97,7 @@ class HorizonEuropeDocxExport(Export):
                 headline.italic = True
                 para.add_run(existing.value)
 
-    def _a2(self, context: _Context, para: Paragraph):
-        para.text = ""
-        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
+    def _a2(self, context: _Context, para: Paragraph) -> None:
         first = True
         for dataset in context.datasets:
             description = self.get_value("project/dataset/description", set_index=dataset.set_index)
@@ -115,7 +117,64 @@ class HorizonEuropeDocxExport(Export):
                 para.add_run("They are provided in the following formats: ")
                 para.add_run(format.value)
 
-    def _replace_paragraph_contents(self, context: _Context, para: Paragraph):
+    def _a3(self, context: _Context, para: Paragraph) -> None:
+        first = True
+        for dataset in context.datasets:
+            description = self.get_value("project/dataset/usage_description", set_index=dataset.set_index)
+
+            if not description:
+                continue
+
+            if not first:
+                para.add_run("\n\n")
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}:\n")
+            headline.italic = True
+            para.add_run(description.value)
+
+    def _a4(self, context: _Context, para: Paragraph) -> None:
+        first = True
+        for dataset in context.datasets:
+            expected_size = self.get_value("project/dataset/size/volume", set_index=dataset.set_index)
+
+            if not expected_size:
+                continue
+
+            if not first:
+                para.add_run("\n\n")
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(f"The expected size of the data is {expected_size.value.lower()}.")
+
+    def _a5(self, context: _Context, para: Paragraph) -> None:
+        first = True
+        for dataset in context.datasets:
+            provenance_content = self.get_values("project/dataset/provenance/content", set_index=dataset.set_index)
+            origin = self.get_value("project/dataset/origin", set_index=dataset.set_index)
+
+            if not provenance_content:
+                continue
+
+            if not first:
+                para.add_run("\n\n")
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            headline.add_break()
+            for v in provenance_content:
+                para.add_run(v.text).add_break()
+
+            if "reused" in origin.value.lower():
+                author = self.get_value( 'project/dataset/creator/name', set_index=dataset.set_index)
+                uri = self.get_value( 'project/dataset/uri', set_index=dataset.set_index)
+                para.add_run(f"The data were created by {author.value} and can be found at the following address: {uri.value}")
+
+
+    def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
 
@@ -134,14 +193,16 @@ class HorizonEuropeDocxExport(Export):
 
 
         if para.text.startswith("{{") and para.text.endswith("}}"):
-            if para.text in context.replacements:
-                value = context.replacements[para.text]
+            if para.text in replacements:
+                value = replacements[para.text]
                 if value is None:
                     replace_para(para, "***error: value not defined***")
                 elif isinstance(value, str):
                     replace_para(para,value)
                 else:
                     style = Style(para.runs[0])
+                    para.text = ""
+                    para.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     value(context, para)
                     for run in para.runs:
                         style.apply(run)
@@ -157,7 +218,7 @@ class HorizonEuropeDocxExport(Export):
             context.partners = self.get_set("project/partner/id")
             context.funders = self.get_set("project/funder/id")
 
-            context.replacements = {
+            replacements = {
                 "{{projectnumber}}" : self.get_text("project/funder/grant_nr"),
                 "{{projectacronym}}": self.get_text("project/acronym"),
                 "{{projecttitle}}"  : self.get_text("project/title"),
@@ -166,63 +227,60 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer01a}}"     : self._a1a,
                 "{{Answer01b}}"     : self._a1b,
                 "{{Answer02}}"      : self._a2,
-                "{{Answer03a}}"     : self._a3a,
-                "{{Answer03b}}"     : self._a3b,
-                "{{Answer03c}}"     : self._a3c,
-                "{{Answer04}}"      : self._a2,
-                "{{Answer05a}}"     : self._a1a,
-                "{{Answer05b}}"     : self._a1b,
-                "{{Answer06}}"      : self._a2,
-                "{{Answer07}}"      : self._a2,
-                "{{Answer08}}"      : self._a2,
-                "{{Answer09}}"      : self._a2,
-                "{{Answer10}}"      : self._a2,
-                "{{Answer11}}"      : self._a2,
-                "{{Answer12}}"      : self._a2,
-                "{{Answer13}}"      : self._a2,
-                "{{Answer14a}}"     : self._a3a,
-                "{{Answer14b}}"     : self._a3b,
-                "{{Answer14c}}"     : self._a3c,
-                "{{Answer15}}"      : self._a2,
-                "{{Answer16}}"      : self._a2,
-                "{{Answer17}}"      : self._a2,
-                "{{Answer18}}"      : self._a2,
-                "{{Answer19}}"      : self._a2,
-                "{{Answer20}}"      : self._a2,
-                "{{Answer21}}"      : self._a2,
-                "{{Answer22}}"      : self._a2,
-                "{{Answer23}}"      : self._a2,
-                "{{Answer24}}"      : self._a2,
-                "{{Answer25}}"      : self._a2,
-                "{{Answer26}}"      : self._a2,
-                "{{Answer27}}"      : self._a2,
-                "{{Answer28}}"      : self._a2,
-                "{{Answer29}}"      : self._a2,
-                "{{Answer30}}"      : self._a2,
-                "{{Answer31a}}"     : self._a3a,
-                "{{Answer31b}}"     : self._a3b,
-                "{{Answer31c}}"     : self._a3c,
-                "{{Answer32}}"      : self._a2,
-                "{{Answer33}}"      : self._a2,
-                "{{Answer34}}"      : self._a2,
-                "{{Answer35}}"      : self._a2,
-                "{{Answer36}}"      : self._a2,
-                "{{Answer37}}"      : self._a2,
-                "{{Answer38a}}"     : self._a1a,
-                "{{Answer38b}}"     : self._a1b,
-                "{{Answer39}}"      : self._a2,
-                "{{Answer40}}"      : self._a2,
-                "{{Answer41}}"      : self._a2,
-                "{{Answer42}}"      : self._a2,
+                "{{Answer03}}"      : self._a3,
+                "{{Answer04}}"      : self._a4,
+                "{{Answer05}}"      : self._a5,
+                "{{Answer06}}"      : self._stub,
+                "{{Answer07}}"      : self._stub,
+                "{{Answer08}}"      : self._stub,
+                "{{Answer09}}"      : self._stub,
+                "{{Answer10}}"      : self._stub,
+                "{{Answer11}}"      : self._stub,
+                "{{Answer12}}"      : self._stub,
+                "{{Answer13}}"      : self._stub,
+                "{{Answer14a}}"     : self._stub,
+                "{{Answer14b}}"     : self._stub,
+                "{{Answer14c}}"     : self._stub,
+                "{{Answer15}}"      : self._stub,
+                "{{Answer16}}"      : self._stub,
+                "{{Answer17}}"      : self._stub,
+                "{{Answer18}}"      : self._stub,
+                "{{Answer19}}"      : self._stub,
+                "{{Answer20}}"      : self._stub,
+                "{{Answer21}}"      : self._stub,
+                "{{Answer22}}"      : self._stub,
+                "{{Answer23}}"      : self._stub,
+                "{{Answer24}}"      : self._stub,
+                "{{Answer25}}"      : self._stub,
+                "{{Answer26}}"      : self._stub,
+                "{{Answer27}}"      : self._stub,
+                "{{Answer28}}"      : self._stub,
+                "{{Answer29}}"      : self._stub,
+                "{{Answer30}}"      : self._stub,
+                "{{Answer31a}}"     : self._stub,
+                "{{Answer31b}}"     : self._stub,
+                "{{Answer31c}}"     : self._stub,
+                "{{Answer32}}"      : self._stub,
+                "{{Answer33}}"      : self._stub,
+                "{{Answer34}}"      : self._stub,
+                "{{Answer35}}"      : self._stub,
+                "{{Answer36}}"      : self._stub,
+                "{{Answer37}}"      : self._stub,
+                "{{Answer38a}}"     : self._stub,
+                "{{Answer38b}}"     : self._stub,
+                "{{Answer39}}"      : self._stub,
+                "{{Answer40}}"      : self._stub,
+                "{{Answer41}}"      : self._stub,
+                "{{Answer42}}"      : self._stub,
             }
 
             for para in doc.paragraphs:
-                self._replace_paragraph_contents(context, para)
+                self._replace_paragraph_contents(replacements, context, para)
             for tab in doc.tables:
                 for c in tab.columns:
                     for cell in c.cells:
                         for para in cell.paragraphs:
-                            self._replace_paragraph_contents(context, para)
+                            self._replace_paragraph_contents(replacements, context, para)
 
         response_data = io.BytesIO()
         doc.save(response_data)
