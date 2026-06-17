@@ -1,8 +1,8 @@
+from rdmo.projects.models.value import Value
 from rdmo.projects.managers import ValueQuerySet
 from collections.abc import Callable
 from importlib import resources
 import io
-from typing import Any
 
 from docx.enum.dml import MSO_COLOR_TYPE
 from docx.text.run import Run
@@ -61,6 +61,11 @@ class _Context(object):
 _ParagraphFunction = Callable[['_Context', Paragraph],None]
 _Replacements = dict[str, str|_ParagraphFunction|None]
 
+
+def has_value(query_response: Value | None) -> bool:
+    return query_response is not None and len(query_response.value.strip()) > 0
+
+
 class HorizonEuropeDocxExport(Export):
 
     def __init__(self, *args, **kwargs):
@@ -70,6 +75,9 @@ class HorizonEuropeDocxExport(Export):
         para.add_run("Stub Text. This is not implemented yet.")
 
     def _a1a(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will you re-use any existing data and what will you re-use it for?
+        """
         first = True
         for dataset in context.datasets:
             if not first:
@@ -85,6 +93,9 @@ class HorizonEuropeDocxExport(Export):
             para.add_run(self.get_text("project/dataset/usage_description", set_index=dataset.set_index))
 
     def _a1b(self, context: _Context, para: Paragraph) -> None:
+        """
+        State the reasons if re-use of any existing data has been considered but discarded.
+        """
         first = True
         for dataset in context.datasets:
             existing = self.get_value("project/dataset/reuse_existing", set_index=dataset.set_index)
@@ -99,6 +110,9 @@ class HorizonEuropeDocxExport(Export):
                 para.add_run(existing.value)
 
     def _a2(self, context: _Context, para: Paragraph) -> None:
+        """
+        What types and formats of data will the project generate or re-use?
+        """
         first = True
         for dataset in context.datasets:
             description = self.get_value("project/dataset/description", set_index=dataset.set_index)
@@ -119,6 +133,9 @@ class HorizonEuropeDocxExport(Export):
                 para.add_run(format.value)
 
     def _a3(self, context: _Context, para: Paragraph) -> None:
+        """
+        What is the purpose of the data generation or re-use and its relation to the objectives of the project?
+        """
         first = True
         for dataset in context.datasets:
             description = self.get_value("project/dataset/usage_description", set_index=dataset.set_index)
@@ -135,6 +152,9 @@ class HorizonEuropeDocxExport(Export):
             para.add_run(description.value)
 
     def _a4(self, context: _Context, para: Paragraph) -> None:
+        """
+        What is the expected size of the data that you intend to generate or re-use?
+        """
         first = True
         for dataset in context.datasets:
             expected_size = self.get_value("project/dataset/size/volume", set_index=dataset.set_index)
@@ -151,6 +171,9 @@ class HorizonEuropeDocxExport(Export):
             para.add_run(f"The expected size of the data is {expected_size.value.lower()}.")
 
     def _a5(self, context: _Context, para: Paragraph) -> None:
+        """
+        What is the origin/provenance of the data, either generated or re-used?
+        """
         first = True
         for dataset in context.datasets:
             provenance_content = self.get_values("project/dataset/provenance/content", set_index=dataset.set_index)
@@ -173,6 +196,77 @@ class HorizonEuropeDocxExport(Export):
                 author = self.get_value( 'project/dataset/creator/name', set_index=dataset.set_index)
                 uri = self.get_value( 'project/dataset/uri', set_index=dataset.set_index)
                 para.add_run(f"The data were created by {author.value} and can be found at the following address: {uri.value}")
+
+    def _a6(self, context: _Context, para: Paragraph) -> None:
+        """
+        To whom might your data be useful ('data utility'), outside your project?
+        """
+        first = True
+        for dataset in context.datasets:
+            use_cases = self.get_values("project/dataset/reuse_scenario", set_index=dataset.set_index)
+
+            if not use_cases:
+                continue
+
+            if not first:
+                para.add_run("\n\n")
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            headline.add_break()
+            for usecase in use_cases:
+                para.add_run(" * " +usecase.text).add_break()
+
+    def _a7(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will the data be identified by a persistent identifier?
+        """
+        first = True
+        for dataset in context.datasets:
+            has_pid = self.get_bool("project/dataset/pids/yesno", set_index=dataset.set_index)
+            pids = self.get_values("project/dataset/pids/system", set_index=dataset.set_index)
+
+            if not has_pid:
+                continue
+
+            if not first:
+                para.add_run("\n\n")
+                first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            headline.add_break()
+            for pid in pids:
+                para.add_run(" * " +pid.value).add_break()
+
+    def _a8(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will rich metadata be provided to allow discovery? What metadata will be created? What disciplinary or general standards will be followed?
+	    In case metadata standards do not exist in your discipline, please outline what type of metadata will be created and how.
+        """
+        first = True
+        for dataset in context.datasets:
+            automatic = self.get_value("project/dataset/metadata/creation_automatic", set_index=dataset.set_index)
+            semiauto = self.get_value("project/dataset/metadata/creation_semi_automatic", set_index=dataset.set_index)
+            manual = self.get_value("project/dataset/metadata/creation_manual", set_index=dataset.set_index)
+
+            if not any([has_value(automatic), has_value(semiauto), has_value(manual)]):
+                continue
+
+            if not first:
+                para.add_run("").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            headline.add_break()
+            if has_value(automatic):
+                para.add_run(" * Automatically created: " + automatic.value).add_break()
+            if has_value(semiauto):
+                para.add_run(" * Automatically created, manually corrected: " + semiauto.value).add_break()
+            if has_value(manual):
+                para.add_run(" * Manually created: " + manual.value).add_break()
 
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
@@ -232,9 +326,9 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer03}}"      : self._a3,
                 "{{Answer04}}"      : self._a4,
                 "{{Answer05}}"      : self._a5,
-                "{{Answer06}}"      : self._stub,
-                "{{Answer07}}"      : self._stub,
-                "{{Answer08}}"      : self._stub,
+                "{{Answer06}}"      : self._a6,
+                "{{Answer07}}"      : self._a7,
+                "{{Answer08}}"      : self._a8,
                 "{{Answer09}}"      : self._stub,
                 "{{Answer10}}"      : self._stub,
                 "{{Answer11}}"      : self._stub,
