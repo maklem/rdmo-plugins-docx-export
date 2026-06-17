@@ -1,3 +1,4 @@
+from rdmo.projects.managers import ValueQuerySet
 from collections.abc import Callable
 from importlib import resources
 import io
@@ -52,10 +53,10 @@ class Style:
 
 
 class _Context(object):
-    def __init__(self):
-        self.datasets: Any = None
-        self.funders: Any = None
-        self.partners: Any = None
+    def __init__(self, datasets: ValueQuerySet, funders: ValueQuerySet, partners: ValueQuerySet):
+        self.datasets = datasets
+        self.funders = funders
+        self.partners = partners
 
 _ParagraphFunction = Callable[['_Context', Paragraph],None]
 _Replacements = dict[str, str|_ParagraphFunction|None]
@@ -210,13 +211,14 @@ class HorizonEuropeDocxExport(Export):
                 replace_para(para, "Lorem Ipsum... ***replacement sequence not defined***")
 
     def render(self):
-        context = _Context()
         template = resources.files(templates) / "horizon-template.docx"
         doc = Document(template.open("rb"))
         with translation.override("en"):
-            context.datasets = self.get_set("project/dataset/id")
-            context.partners = self.get_set("project/partner/id")
-            context.funders = self.get_set("project/funder/id")
+            context = _Context(
+                datasets = self.get_set("project/dataset/id"),
+                partners = self.get_set("project/partner/id"),
+                funders = self.get_set("project/funder/id"),
+            )
 
             replacements = {
                 "{{projectnumber}}" : self.get_text("project/funder/grant_nr"),
