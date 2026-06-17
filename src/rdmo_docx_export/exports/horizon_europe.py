@@ -268,6 +268,70 @@ class HorizonEuropeDocxExport(Export):
             if has_value(manual):
                 para.add_run(" * Manually created: " + manual.value).add_break()
 
+    def _a9(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will search keywords be provided in the metadata to optimize the possibility for discovery and then potential re-use?
+        """
+        first = True
+        for dataset in context.datasets:
+            keywords = self.get_value("project/dataset/metadata/search_keywords", set_index=dataset.set_index)
+
+            if not has_value(keywords):
+                continue
+
+            if not first:
+                para.add_run("").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(keywords.value)
+
+    def _a10(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will metadata be offered in such a way that they can be harvested and indexed?
+        """
+        first = True
+        for dataset in context.datasets:
+            harvesting = self.get_value("project/dataset/metadata/harvesting", set_index=dataset.set_index)
+
+            if not has_value(harvesting):
+                continue
+
+            if not first:
+                para.add_run("").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(harvesting.value)
+
+    def _a11(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will the data be deposited in a trusted repository?
+        """
+        first = True
+        for dataset in context.datasets:
+            repositories = self.get_values("project/dataset/preservation/repository", set_index=dataset.set_index)
+            trusted = self.get_values("project/dataset/preservation/trusted", set_index=dataset.set_index)
+
+            if len(repositories) == 0:
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run("The dataset is stored in a ")
+            para.add_run(", ".join(r.value for r in repositories) + ".")
+
+            if len(trusted) > 0:
+                para.add_run("\nThis repository is trusted because: ")
+                para.add_run(", ".join(t.value for t in trusted) +  ".")
+
+
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -329,9 +393,9 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer06}}"      : self._a6,
                 "{{Answer07}}"      : self._a7,
                 "{{Answer08}}"      : self._a8,
-                "{{Answer09}}"      : self._stub,
-                "{{Answer10}}"      : self._stub,
-                "{{Answer11}}"      : self._stub,
+                "{{Answer09}}"      : self._a9,
+                "{{Answer10}}"      : self._a10,
+                "{{Answer11}}"      : self._a11,
                 "{{Answer12}}"      : self._stub,
                 "{{Answer13}}"      : self._stub,
                 "{{Answer14a}}"     : self._stub,
