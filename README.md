@@ -2,6 +2,12 @@
 
 This plugin is the follow up to RDMO-Hackerton 2026, group "views".
 
+**Abstract**  
+The current implementation of views in RDMO generates HTML, and then uses Pandoc to convert to other formats.
+A conversion typically drops some information (usually style).
+To generate documents with a specified style, here we generate docx (the target format) using a template-docx-document.
+This allows us to keep most style information intact, by not touching it at all.
+
 ## Installing
 
 ### Installing the plugin (PyPi)
