@@ -76,6 +76,29 @@ class HorizonEuropeDocxExport(Export):
     def _stub(self, context: _Context, para: Paragraph) -> None:
         para.add_run("Stub Text. This is not implemented yet.")
 
+    class _dataset_database_value_proxy:
+        def __init__(self, parent, field):
+            self.parent = parent
+            self.field = field
+        def __call__(self, context: _Context, para: Paragraph) -> None:
+            first = True
+            for dataset in context.datasets:
+                data_sharing = self.parent.get_value(self.field, set_index=dataset.set_index)
+
+                if not has_value(data_sharing):
+                    continue
+
+                if not first:
+                    para.add_run("\n").add_break()
+                first = False
+
+                headline = para.add_run(f"Dataset {dataset.value}: ")
+                headline.italic = True
+                para.add_run(data_sharing.value + ".")
+
+    def _dataset_database_value(self, field):
+        return self._dataset_database_value_proxy(self, field)
+
     def _a1a(self, context: _Context, para: Paragraph) -> None:
         """
         Will you re-use any existing data and what will you re-use it for?
@@ -93,23 +116,6 @@ class HorizonEuropeDocxExport(Export):
             headline.add_break()
             para.add_run(f"This dataset is {origin.value.lower().replace('both (', '').replace(')','')}.\n")
             para.add_run(self.get_text("project/dataset/usage_description", set_index=dataset.set_index))
-
-    def _a1b(self, context: _Context, para: Paragraph) -> None:
-        """
-        State the reasons if re-use of any existing data has been considered but discarded.
-        """
-        first = True
-        for dataset in context.datasets:
-            existing = self.get_value("project/dataset/reuse_existing", set_index=dataset.set_index)
-
-            if existing and existing.value:  # if value exists and is not empty
-                if not first:
-                    para.add_run("\n\n")
-                first = False
-
-                headline = para.add_run(f"Dataset {dataset.value}:")
-                headline.italic = True
-                para.add_run(existing.value)
 
     def _a2(self, context: _Context, para: Paragraph) -> None:
         """
@@ -133,25 +139,6 @@ class HorizonEuropeDocxExport(Export):
             if format:
                 para.add_run("They are provided in the following formats: ")
                 para.add_run(format.value)
-
-    def _a3(self, context: _Context, para: Paragraph) -> None:
-        """
-        What is the purpose of the data generation or re-use and its relation to the objectives of the project?
-        """
-        first = True
-        for dataset in context.datasets:
-            description = self.get_value("project/dataset/usage_description", set_index=dataset.set_index)
-
-            if not description:
-                continue
-
-            if not first:
-                para.add_run("\n\n")
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}:\n")
-            headline.italic = True
-            para.add_run(description.value)
 
     def _a4(self, context: _Context, para: Paragraph) -> None:
         """
@@ -270,43 +257,6 @@ class HorizonEuropeDocxExport(Export):
             if has_value(manual):
                 para.add_run(" * Manually created: " + manual.value).add_break()
 
-    def _a9(self, context: _Context, para: Paragraph) -> None:
-        """
-        Will search keywords be provided in the metadata to optimize the possibility for discovery and then potential re-use?
-        """
-        first = True
-        for dataset in context.datasets:
-            keywords = self.get_value("project/dataset/metadata/search_keywords", set_index=dataset.set_index)
-
-            if not has_value(keywords):
-                continue
-
-            if not first:
-                para.add_run("").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(keywords.value)
-
-    def _a10(self, context: _Context, para: Paragraph) -> None:
-        """
-        Will metadata be offered in such a way that they can be harvested and indexed?
-        """
-        first = True
-        for dataset in context.datasets:
-            harvesting = self.get_value("project/dataset/metadata/harvesting", set_index=dataset.set_index)
-
-            if not has_value(harvesting):
-                continue
-
-            if not first:
-                para.add_run("").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(harvesting.value)
 
     def _a11(self, context: _Context, para: Paragraph) -> None:
         """
@@ -352,24 +302,6 @@ class HorizonEuropeDocxExport(Export):
             headline.italic = True
             para.add_run(", ".join(r.value for r in repository_arrangements) + ".")
 
-    def _a13a(self, context: _Context, para: Paragraph) -> None:
-        """
-        Does the repository ensure that the data are assigned an identifier?
-        """
-        first = True
-        for dataset in context.datasets:
-            has_pid = self.get_value("project/dataset/pids/yesno", set_index=dataset.set_index)
-
-            if not has_value(has_pid):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(has_pid.value)
 
     def _a13b(self, context: _Context, para: Paragraph) -> None:
         """
@@ -392,25 +324,6 @@ class HorizonEuropeDocxExport(Export):
             if "no" not in resolver.value.lower():
                 para.add_run(", the repository will resolve the identifier to a digital object")
             para.add_run(".")
-
-    def _a14a(self, context: _Context, para: Paragraph) -> None:
-        """
-        Does the repository ensure that the data are assigned an identifier?
-        """
-        first = True
-        for dataset in context.datasets:
-            data_sharing = self.get_value("project/dataset/sharing/yesno", set_index=dataset.set_index)
-
-            if not has_value(data_sharing):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(data_sharing.value + ".")
 
     def _a14b(self, context: _Context, para: Paragraph) -> None:
         """
@@ -457,64 +370,6 @@ class HorizonEuropeDocxExport(Export):
             para.add_run("An embargo is applied, for the ")
             para.add_run(", ".join(r.value for r in embargo_perioods) + ".")
 
-    def _a16(self, context: _Context, para: Paragraph) -> None:
-        """
-        Will the data be accessible through a free and standardized access protocol?
-        """
-        first = True
-        for dataset in context.datasets:
-            sharing_condition = self.get_value("project/dataset/sharing/conditions", set_index=dataset.set_index)
-
-            if not has_value(sharing_condition):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run("The data will be shared under the following conditions: ")
-            para.add_run(sharing_condition.value)
-
-    def _a17(self, context: _Context, para: Paragraph) -> None:
-        """
-        If there are restrictions on use, how will access be provided to the data, both during and after the end of the project?
-        """
-        first = True
-        for dataset in context.datasets:
-            sharing_condition = self.get_value("project/dataset/sharing/restrictions_explanation", set_index=dataset.set_index)
-
-            if not has_value(sharing_condition):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(sharing_condition.value)
-
-    def _a18(self, context: _Context, para: Paragraph) -> None:
-        """
-        How will the identity of the person accessing the data be ascertained?
-        """
-        first = True
-        for dataset in context.datasets:
-            sharing_condition = self.get_value("project/dataset/preservation/access_authentication", set_index=dataset.set_index)
-
-            if not has_value(sharing_condition):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(sharing_condition.value)
-
     def _a19(self, context: _Context, para: Paragraph) -> None:
         """
         Is there a need for a data access committee (e.g. to evaluate/approve access requests to personal/sensitive data)?
@@ -536,45 +391,6 @@ class HorizonEuropeDocxExport(Export):
             para.add_run(
                 "This consortium has not established a Data Access Committee. The appointed data"
                 " responsible / corresponding author will decide alone about granting access to the data.")
-
-
-    def _a20a(self, context: _Context, para: Paragraph) -> None:
-        """
-        Will metadata be made openly available and licenced under a public domain dedication CC0, as per the Grant Agreement? If not, please clarify why.
-        """
-        first = True
-        for dataset in context.datasets:
-            license = self.get_value("project/dataset/metadata/license_for_metadata", set_index=dataset.set_index)
-
-            if not has_value(license):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(license.value)
-
-    def _a20b(self, context: _Context, para: Paragraph) -> None:
-        """
-        Will metadata contain information to enable the user to access the data?
-        """
-        first = True
-        for dataset in context.datasets:
-            access_info = self.get_value("project/dataset/metadata/access_info", set_index=dataset.set_index)
-
-            if not has_value(access_info):
-                continue
-
-            if not first:
-                para.add_run("\n").add_break()
-            first = False
-
-            headline = para.add_run(f"Dataset {dataset.value}: ")
-            headline.italic = True
-            para.add_run(access_info.value)
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -634,38 +450,41 @@ class HorizonEuropeDocxExport(Export):
                 "{{dmpdate}}"       : self.get_text("project/dmp/dmp_date"),
                 "{{dmpversion}}"    : self.get_text("project/dmp/dmp_version"),
                 "{{Answer01a}}"     : self._a1a,
-                "{{Answer01b}}"     : self._a1b,
+                "{{Answer01b}}"     : self._dataset_database_value("project/dataset/reuse_existing"),
                 "{{Answer02}}"      : self._a2,
-                "{{Answer03}}"      : self._a3,
+                "{{Answer03}}"      : self._dataset_database_value("project/dataset/usage_description"),
                 "{{Answer04}}"      : self._a4,
                 "{{Answer05}}"      : self._a5,
                 "{{Answer06}}"      : self._a6,
                 "{{Answer07}}"      : self._a7,
                 "{{Answer08}}"      : self._a8,
-                "{{Answer09}}"      : self._a9,
-                "{{Answer10}}"      : self._a10,
+                "{{Answer09}}"      : self._dataset_database_value("project/dataset/metadata/search_keywords"),
+                "{{Answer10}}"      : self._dataset_database_value("project/dataset/metadata/harvesting"),
                 "{{Answer11}}"      : self._a11,
                 "{{Answer12}}"      : self._a12,
-                "{{Answer13a}}"     : self._a13a,
+                "{{Answer13a}}"     : self._dataset_database_value("project/dataset/pids/yesno"),
                 "{{Answer13b}}"     : self._a13b,
-                "{{Answer14a}}"     : self._a14a,
+                "{{Answer14a}}"     : self._dataset_database_value('project/dataset/sharing/yesno'),
                 "{{Answer14b}}"     : self._a14b,
                 "{{Answer15}}"      : self._a15,
-                "{{Answer16}}"      : self._a16,
-                "{{Answer17}}"      : self._a17,
-                "{{Answer18}}"      : self._a18,
+                "{{Answer16}}"      : self._dataset_database_value('project/dataset/sharing/conditions'),
+                "{{Answer17}}"      : self._dataset_database_value('project/dataset/sharing/restrictions_explanation'),
+                "{{Answer18}}"      : self._dataset_database_value('project/dataset/preservation/access_authentication'),
                 "{{Answer19}}"      : self._a19,
-                "{{Answer20a}}"     : self._a20a,
-                "{{Answer20b}}"     : self._a20b,
-                "{{Answer21}}"      : self._stub,
+                "{{Answer20a}}"     : self._dataset_database_value('project/dataset/metadata/license_for_metadata'),
+                "{{Answer20b}}"     : self._dataset_database_value('project/dataset/metadata/access_info'),
+                "{{Answer21a}}"     : self._dataset_database_value("project/dataset/preservation/reuse_duration"),
+                "{{Answer21b}}"     : self._dataset_database_value("project/dataset/metadata/available_without_data"),
                 "{{Answer22}}"      : self._stub,
-                "{{Answer23}}"      : self._stub,
+                "{{Answer23a}}"     : self._dataset_database_value("project/dataset/metadata/standards"),
+                "{{Answer23b}}"     : self._dataset_database_value("project/dataset/interoperability"),
                 "{{Answer24}}"      : self._stub,
-                "{{Answer25}}"      : self._stub,
+                "{{Answer25}}"      : self._dataset_database_value("project/dataset/metadata/references_to_other_data"),
                 "{{Answer26}}"      : self._stub,
-                "{{Answer27}}"      : self._stub,
+                "{{Answer27a}}"     : self._dataset_database_value("project/dataset/sharing/yesno"),
+                "{{Answer27b}}"     : self._stub,
                 "{{Answer28}}"      : self._stub,
-                "{{Answer29}}"      : self._stub,
+                "{{Answer29}}"      : self._dataset_database_value("project/dataset/provenance/standards"),
                 "{{Answer30}}"      : self._stub,
                 "{{Answer31a}}"     : self._stub,
                 "{{Answer31b}}"     : self._stub,
