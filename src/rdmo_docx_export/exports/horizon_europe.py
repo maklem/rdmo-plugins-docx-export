@@ -434,6 +434,87 @@ class HorizonEuropeDocxExport(Export):
             for e in explanation:
                 para.add_run(e.value).add_break()
 
+    def _a15(self, context: _Context, para: Paragraph) -> None:
+        """
+        If an embargo is applied to give time to publish or seek protection of the intellectual property (e.g. patents),
+	    specify why and how long this will apply, bearing in mind that research data should be made available as soon as possible.
+        """
+        first = True
+        for dataset in context.datasets:
+            embargo_perioods = self.get_values("project/dataset/preservation/embargo_period", set_index=dataset.set_index)
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+
+            if len(embargo_perioods) == 0:
+                para.add_run("No embargo is applied.")
+                continue
+
+            para.add_run("An embargo is applied, for the ")
+            para.add_run(", ".join(r.value for r in embargo_perioods) + ".")
+
+    def _a16(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will the data be accessible through a free and standardized access protocol?
+        """
+        first = True
+        for dataset in context.datasets:
+            sharing_condition = self.get_value("project/dataset/sharing/conditions", set_index=dataset.set_index)
+
+            if not has_value(sharing_condition):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run("The data will be shared under the following conditions: ")
+            para.add_run(sharing_condition.value)
+
+    def _a17(self, context: _Context, para: Paragraph) -> None:
+        """
+        If there are restrictions on use, how will access be provided to the data, both during and after the end of the project?
+        """
+        first = True
+        for dataset in context.datasets:
+            sharing_condition = self.get_value("project/dataset/sharing/restrictions_explanation", set_index=dataset.set_index)
+
+            if not has_value(sharing_condition):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(sharing_condition.value)
+
+    def _a18(self, context: _Context, para: Paragraph) -> None:
+        """
+        How will the identity of the person accessing the data be ascertained?
+        """
+        first = True
+        for dataset in context.datasets:
+            sharing_condition = self.get_value("project/dataset/preservation/access_authentication", set_index=dataset.set_index)
+
+            if not has_value(sharing_condition):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(sharing_condition.value)
+
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
@@ -508,10 +589,10 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer13b}}"     : self._a13b,
                 "{{Answer14a}}"     : self._a14a,
                 "{{Answer14b}}"     : self._a14b,
-                "{{Answer15}}"      : self._stub,
-                "{{Answer16}}"      : self._stub,
-                "{{Answer17}}"      : self._stub,
-                "{{Answer18}}"      : self._stub,
+                "{{Answer15}}"      : self._a15,
+                "{{Answer16}}"      : self._a16,
+                "{{Answer17}}"      : self._a17,
+                "{{Answer18}}"      : self._a18,
                 "{{Answer19}}"      : self._stub,
                 "{{Answer20}}"      : self._stub,
                 "{{Answer21}}"      : self._stub,
