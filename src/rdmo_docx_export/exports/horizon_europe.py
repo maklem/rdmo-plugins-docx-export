@@ -515,6 +515,67 @@ class HorizonEuropeDocxExport(Export):
             headline.italic = True
             para.add_run(sharing_condition.value)
 
+    def _a19(self, context: _Context, para: Paragraph) -> None:
+        """
+        Is there a need for a data access committee (e.g. to evaluate/approve access requests to personal/sensitive data)?
+        """
+        comittee = self.get_value('project/legal_aspects/official_approval/data_access_committee')
+
+        if has_value(comittee) and "yes" in comittee.value.lower():
+            para.add_run(
+                "This consortium will have a Data Access Committee. Their remit will be to select the"
+                " data that will be openly accessible on a case-by-case basis. Ethical aspects and data security,"
+                " including intellectual property requirements, will be considered as will access requests to"
+                " personal/sensitive data. If necessary, some or all of a potential publication's data will be"
+                " withheld. This will be decided in consultation with the relevant partner(s).")
+        elif has_value(comittee) and "no" in comittee.value.lower():
+            para.add_run(
+                "This consortium will not have a Data Access Committee, because the project is not"
+                " going to produce sensitive data. All results will be publicly available without restrictions.")
+        else:
+            para.add_run(
+                "This consortium has not established a Data Access Committee. The appointed data"
+                " responsible / corresponding author will decide alone about granting access to the data.")
+
+
+    def _a20a(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will metadata be made openly available and licenced under a public domain dedication CC0, as per the Grant Agreement? If not, please clarify why.
+        """
+        first = True
+        for dataset in context.datasets:
+            license = self.get_value("project/dataset/metadata/license_for_metadata", set_index=dataset.set_index)
+
+            if not has_value(license):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(license.value)
+
+    def _a20b(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will metadata contain information to enable the user to access the data?
+        """
+        first = True
+        for dataset in context.datasets:
+            access_info = self.get_value("project/dataset/metadata/access_info", set_index=dataset.set_index)
+
+            if not has_value(access_info):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(access_info.value)
+
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
@@ -593,8 +654,9 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer16}}"      : self._a16,
                 "{{Answer17}}"      : self._a17,
                 "{{Answer18}}"      : self._a18,
-                "{{Answer19}}"      : self._stub,
-                "{{Answer20}}"      : self._stub,
+                "{{Answer19}}"      : self._a19,
+                "{{Answer20a}}"     : self._a20a,
+                "{{Answer20b}}"     : self._a20b,
                 "{{Answer21}}"      : self._stub,
                 "{{Answer22}}"      : self._stub,
                 "{{Answer23}}"      : self._stub,
