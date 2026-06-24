@@ -1,8 +1,7 @@
-from rdmo.projects.models.value import Value
-from rdmo.projects.managers import ValueQuerySet
 from collections.abc import Callable
 from importlib import resources
 import io
+import logging
 
 from docx.enum.dml import MSO_COLOR_TYPE
 from docx.text.run import Run
@@ -14,9 +13,12 @@ from django.http import HttpResponse
 from django.utils import translation
 
 from rdmo.projects.exports import Export
+from rdmo.projects.models.value import Value
+from rdmo.projects.managers import ValueQuerySet
 
 import rdmo_docx_export.exports.templates as templates
 
+logger = logging.getLogger("rdmo."+__name__)
 
 class Style:
     def __init__(self, run: Run):
@@ -331,7 +333,65 @@ class HorizonEuropeDocxExport(Export):
                 para.add_run("\nThis repository is trusted because: ")
                 para.add_run(", ".join(t.value for t in trusted) +  ".")
 
+    def _a12(self, context: _Context, para: Paragraph) -> None:
+        """
+        Have you explored appropriate arrangements with the identified repository where your data will be deposited?
+        """
+        first = True
+        for dataset in context.datasets:
+            repository_arrangements = self.get_values("project/dataset/preservation/repository_arrangements", set_index=dataset.set_index)
 
+            if len(repository_arrangements) == 0:
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(", ".join(r.value for r in repository_arrangements) + ".")
+
+    def _a13a(self, context: _Context, para: Paragraph) -> None:
+        """
+        Does the repository ensure that the data are assigned an identifier?
+        """
+        first = True
+        for dataset in context.datasets:
+            has_pid = self.get_value("project/dataset/pids/yesno", set_index=dataset.set_index)
+
+            if not has_value(has_pid):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(has_pid.value)
+
+    def _a13b(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will the repository resolve the identifier to a digital object?
+        """
+        first = True
+        for dataset in context.datasets:
+            resolver = self.get_value("project/dataset/pids/resolver", set_index=dataset.set_index)
+
+            if not has_value(resolver):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(resolver.value)
+            if "no" not in resolver.value.lower():
+                para.add_run(", the repository will resolve the identifier to a digital object")
+            para.add_run(".")
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -369,6 +429,12 @@ class HorizonEuropeDocxExport(Export):
                 replace_para(para, "Lorem Ipsum... ***replacement sequence not defined***")
 
     def render(self):
+        logger.info("Generating Docx Document...")
+        logger.info("TEST logging Umlaute...")
+        logger.info("ÄÖÜ...".encode('unicode_escape').decode('ascii'))
+        logger.info(f"{'äöü'}")
+        logger.info("TEST done.")
+
         template = resources.files(templates) / "horizon-template.docx"
         doc = Document(template.open("rb"))
         with translation.override("en"):
@@ -396,11 +462,11 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer09}}"      : self._a9,
                 "{{Answer10}}"      : self._a10,
                 "{{Answer11}}"      : self._a11,
-                "{{Answer12}}"      : self._stub,
-                "{{Answer13}}"      : self._stub,
+                "{{Answer12}}"      : self._a12,
+                "{{Answer13a}}"     : self._a13a,
+                "{{Answer13b}}"     : self._a13b,
                 "{{Answer14a}}"     : self._stub,
                 "{{Answer14b}}"     : self._stub,
-                "{{Answer14c}}"     : self._stub,
                 "{{Answer15}}"      : self._stub,
                 "{{Answer16}}"      : self._stub,
                 "{{Answer17}}"      : self._stub,
