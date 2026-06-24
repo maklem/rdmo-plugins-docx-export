@@ -64,9 +64,15 @@ _ParagraphFunction = Callable[['_Context', Paragraph],None]
 _Replacements = dict[str, str|_ParagraphFunction|None]
 
 
-def has_value(query_response: Value | None) -> bool:
-    return query_response is not None and len(query_response.value.strip()) > 0
+def has_value(query_response: Value | ValueQuerySet | None) -> bool:
+    if query_response is None:
+        return False
+    if isinstance(query_response, ValueQuerySet):
+        return len(query_response) > 0
+    return len(query_response.value.strip()) > 0
 
+def render_as_list(values: ValueQuerySet) -> str:
+    return "\n".join(" * "+v.value for v in values)
 
 class HorizonEuropeDocxExport(Export):
 
@@ -226,8 +232,7 @@ class HorizonEuropeDocxExport(Export):
             headline = para.add_run(f"Dataset {dataset.value}: ")
             headline.italic = True
             headline.add_break()
-            for pid in pids:
-                para.add_run(" * " +pid.value).add_break()
+            para.add_run(render_as_list(pids))
 
     def _a8(self, context: _Context, para: Paragraph) -> None:
         """
@@ -438,7 +443,7 @@ class HorizonEuropeDocxExport(Export):
             headline = para.add_run(f"Dataset {dataset.value}: ")
             headline.italic = True
             para.add_run(f"We will provide documentation { documentation_where.value.lower() }, in the form of:\n")
-            para.add_run("\n".join( " * "+v.value for v in documentations))
+            para.add_run(render_as_list(documentations))
 
 
     def _a27b(self, context: _Context, para: Paragraph) -> None:
@@ -459,6 +464,25 @@ class HorizonEuropeDocxExport(Export):
             headline = para.add_run(f"Dataset {dataset.value}: ")
             headline.italic = True
             para.add_run(f"Yes, with the following license: { sharing_conditions.value }.")
+
+    def _a30(self, context: _Context, para: Paragraph) -> None:
+        """
+        Describe all relevant data quality assurance processes.
+        """
+        first = True
+        for dataset in context.datasets:
+            qa = self.get_values('project/dataset/quality_assurance', set_index=dataset.set_index)
+
+            if not has_value(qa):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(render_as_list(qa))
 
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
@@ -552,12 +576,10 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer26}}"      : self._a26,
                 "{{Answer27a}}"     : self._dataset_database_value("project/dataset/sharing/yesno"),
                 "{{Answer27b}}"     : self._a27b,
-                "{{Answer28}}"      : self._stub,
+                "{{Answer28}}"      : "The data will be available for re-use, as far as reported in question 21.",
                 "{{Answer29}}"      : self._dataset_database_value("project/dataset/provenance/standards"),
-                "{{Answer30}}"      : self._stub,
-                "{{Answer31a}}"     : self._stub,
-                "{{Answer31b}}"     : self._stub,
-                "{{Answer31c}}"     : self._stub,
+                "{{Answer30}}"      : self._a30,
+                "{{Answer31}}"     : "We will address these aspects in the following section",
                 "{{Answer32}}"      : self._stub,
                 "{{Answer33}}"      : self._stub,
                 "{{Answer34}}"      : self._stub,
