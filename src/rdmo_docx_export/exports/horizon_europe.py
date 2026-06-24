@@ -393,6 +393,47 @@ class HorizonEuropeDocxExport(Export):
                 para.add_run(", the repository will resolve the identifier to a digital object")
             para.add_run(".")
 
+    def _a14a(self, context: _Context, para: Paragraph) -> None:
+        """
+        Does the repository ensure that the data are assigned an identifier?
+        """
+        first = True
+        for dataset in context.datasets:
+            data_sharing = self.get_value("project/dataset/sharing/yesno", set_index=dataset.set_index)
+
+            if not has_value(data_sharing):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(data_sharing.value + ".")
+
+    def _a14b(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will the repository resolve the identifier to a digital object?
+        """
+        first = True
+        for dataset in context.datasets:
+            explanation = self.get_values("project/dataset/sharing/explanation", set_index=dataset.set_index)
+
+            explanation = [ e for e in explanation if has_value(e) ]
+
+            if len(explanation) == 0:
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}:\n")
+            headline.italic = True
+            for e in explanation:
+                para.add_run(e.value).add_break()
+
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
@@ -465,8 +506,8 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer12}}"      : self._a12,
                 "{{Answer13a}}"     : self._a13a,
                 "{{Answer13b}}"     : self._a13b,
-                "{{Answer14a}}"     : self._stub,
-                "{{Answer14b}}"     : self._stub,
+                "{{Answer14a}}"     : self._a14a,
+                "{{Answer14b}}"     : self._a14b,
                 "{{Answer15}}"      : self._stub,
                 "{{Answer16}}"      : self._stub,
                 "{{Answer17}}"      : self._stub,
