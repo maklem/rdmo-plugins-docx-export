@@ -392,6 +392,75 @@ class HorizonEuropeDocxExport(Export):
                 "This consortium has not established a Data Access Committee. The appointed data"
                 " responsible / corresponding author will decide alone about granting access to the data.")
 
+    def _a24(self, context: _Context, para: Paragraph) -> None:
+        """
+        In case it is unavoidable that you use uncommon or generate project specific ontologies or vocabularies,
+        will you provide mappings to more commonly used ontologies?
+	    Will you openly publish the generated ontologies or vocabularies to allow reusing, refining or extending them?
+        """
+        first = True
+        for dataset in context.datasets:
+            mappings = self.get_value('project/dataset/metadata/mappings', set_index=dataset.set_index)
+            vocabularies = self.get_value('project/dataset/metadata/vocabularies_open', set_index=dataset.set_index)
+
+            if not has_value(mappings):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(mappings.value)
+
+            if has_value(vocabularies):
+                para.add_run("\n"+vocabularies.value)
+
+    def _a26(self, context: _Context, para: Paragraph) -> None:
+        """
+        How will you provide documentation needed to validate data analysis and facilitate data re-use
+    	(e.g. readme files with information on methodology, codebooks, data cleaning, analyses, variable
+        definitions, units of measurement, etc.)?
+        """
+        first = True
+        for dataset in context.datasets:
+            documentation_where = self.get_value('project/dataset/documentation/where', set_index=dataset.set_index)
+            documentations = self.get_values('project/dataset/documentation', set_index=dataset.set_index)
+
+            if not has_value(documentation_where):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(f"We will provide documentation { documentation_where.value.lower() }, in the form of:\n")
+            para.add_run("\n".join( " * "+v.value for v in documentations))
+
+
+    def _a27b(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will your data be licensed using standard reuse licenses, in line with the obligations set out in the Grant Agreement?
+        """
+        first = True
+        for dataset in context.datasets:
+            sharing_conditions = self.get_value('project/dataset/sharing/conditions', set_index=dataset.set_index)
+
+            if not has_value(sharing_conditions):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(f"Yes, with the following license: { sharing_conditions.value }.")
+
+
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
@@ -475,14 +544,14 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer20b}}"     : self._dataset_database_value('project/dataset/metadata/access_info'),
                 "{{Answer21a}}"     : self._dataset_database_value("project/dataset/preservation/reuse_duration"),
                 "{{Answer21b}}"     : self._dataset_database_value("project/dataset/metadata/available_without_data"),
-                "{{Answer22}}"      : self._stub,
+                "{{Answer22}}"      : self._dataset_database_value('project/dataset/software_documentation'),
                 "{{Answer23a}}"     : self._dataset_database_value("project/dataset/metadata/standards"),
                 "{{Answer23b}}"     : self._dataset_database_value("project/dataset/interoperability"),
-                "{{Answer24}}"      : self._stub,
+                "{{Answer24}}"      : self._a24,
                 "{{Answer25}}"      : self._dataset_database_value("project/dataset/metadata/references_to_other_data"),
-                "{{Answer26}}"      : self._stub,
+                "{{Answer26}}"      : self._a26,
                 "{{Answer27a}}"     : self._dataset_database_value("project/dataset/sharing/yesno"),
-                "{{Answer27b}}"     : self._stub,
+                "{{Answer27b}}"     : self._a27b,
                 "{{Answer28}}"      : self._stub,
                 "{{Answer29}}"      : self._dataset_database_value("project/dataset/provenance/standards"),
                 "{{Answer30}}"      : self._stub,
