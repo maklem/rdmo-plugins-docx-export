@@ -642,6 +642,91 @@ class HorizonEuropeDocxExport(Export):
             if certified is not None:
                 para.add_run("(certified)" if certified.value else "(not certified)")
 
+    def _a40(self, context: _Context, para: Paragraph) -> None:
+        """
+        Are there, or could there be, any ethics or legal issues that can have an impact on data sharing?
+        """
+        part_personal = para.add_run("Personal data")
+        part_personal.bold = True
+
+        for dataset in context.datasets:
+            sensitive = self.get_bool('project/dataset/sensitive_data/personal_data_yesno/yesno', set_index=dataset.set_index)
+
+            if sensitive is None or not sensitive:
+                continue
+
+            identifying = self.get_bool('project/dataset/sensitive_data/personal_data/bdsg_3_9', set_index=dataset.set_index)
+            anonymization = self.get_value('project/dataset/sensitive_data/personal_data/anonymization', set_index=dataset.set_index)
+            deletion = self.get_value('project/dataset/sensitive_data/personal_data/deletion', set_index=dataset.set_index)
+
+            headline = para.add_run(f"\nDataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run("The dataset contains personal data.")
+            if identifying is not None and identifying:
+                para.add_run("\nSome data contain information allowing person identification.")
+            if has_value(anonymization):
+                para.add_run(f"\nThe personal data will be anonymised/pseudonymised: {anonymization.value}.")
+            if has_value(deletion):
+                para.add_run(f"\nThe personal data will be safely deleted {deletion.value}.")
+
+        part_other_sensitive = para.add_run("\n\nOther sensitive data")
+        part_other_sensitive.bold = True
+
+        for dataset in context.datasets:
+            sensitive = self.get_value('project/dataset/sensitive_data/other/description', set_index=dataset.set_index)
+
+            if not has_value(sensitive):
+                continue
+
+            headline = para.add_run(f"\nDataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(sensitive.value)            
+
+        part_approval = para.add_run("\n\nOfficial approval")
+        part_approval.bold = True
+        committee = self.get_value('project/legal_aspects/official_approval/ethics_committee')
+        if has_value(committee):
+            para.add_run(f"\nThe research has been { committee.value }.")
+
+        statutatory= self.get_bool('project/legal_aspects/official_approval/statutatory_approval/yesno')
+        if has_value(statutatory) and statutatory.value:
+            title = self.get_value('project/legal_aspects/official_approval/statutatory_approval/title')
+            agency = self.get_value('project/legal_aspects/official_approval/statutatory_approval/agency')
+            if has_value(title) or has_value(agency):
+                para.add_run("\nThe research has been approved")
+                if has_value(title):
+                    para.add_run(f" under the title {title.value}")
+                if has_value(agency):
+                    para.add_run(f" by the following agency: {agency.value}")
+                para.add_run(".")
+
+        part_ipr = para.add_run("\n\nIntellectual property rights")
+        part_ipr.bold = True
+
+        first = True
+        for dataset in context.datasets:
+            sensitive = self.get_bool('project/legal_aspects/ipr/yesno', set_index=dataset.set_index)
+
+            if not has_value(sensitive) or not sensitive:
+                continue
+
+            if not first:
+                para.add_run("\n")
+            first = False
+
+            copyright = self.get_bool('project/legal_aspects/ipr/copyrights', set_index=dataset.set_index)
+            other_right = self.get_bool('project/legal_aspects/ipr/other_rights', set_index=dataset.set_index)
+
+            headline = para.add_run(f"\nDataset {dataset.value}:")
+            headline.italic = True
+            if has_value(copyright):
+                para.add_run(f"\n{copyright.value}")
+            if has_value(other_right):
+                para.add_run(f"\n{other_right.value}")
+
+        para.add_run("\n\nSee question 17 and the following question for further details.")
+
+
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
@@ -745,7 +830,7 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer37}}"      : self._a37,
                 "{{Answer38}}"      : self._a38,
                 "{{Answer39}}"      : self._a39,
-                "{{Answer40}}"      : self._stub,
+                "{{Answer40}}"      : self._a40,
                 "{{Answer41}}"      : self._stub,
                 "{{Answer42}}"      : self._stub,
             }
