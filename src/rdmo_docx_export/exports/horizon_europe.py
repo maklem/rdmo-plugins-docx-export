@@ -484,6 +484,46 @@ class HorizonEuropeDocxExport(Export):
             headline.italic = True
             para.add_run(render_as_list(qa))
 
+    def _a32(self, context: _Context, para: Paragraph) -> None:
+        """
+        In addition to the management of data, beneficiaries should also consider and plan for
+        the management of other research outputs that may be generated or re-used throughout their
+        projects.
+    	Such outputs can be either digital (e.g. software, workflows, protocols, models, etc.) or
+        physical (<i>e.g.</i> new materials, antibodies, reagents, samples, etc.).
+        """
+        outputs = self.get_values('project/other_research_output/plan')
+
+        para.add_run("The project will produce research output also of the following types:\n")
+        para.add_run(render_as_list(outputs))
+
+    def _a33(self, context: _Context, para: Paragraph) -> None:
+        """
+        Beneficiaries should consider which of the questions pertaining to FAIR data above can apply
+        to the management of other research outputs, and should strive to provide sufficient detail
+        on how their research outputs will be managed and shared, or made available for re-use, in
+        line with the FAIR principles.
+        """
+        outputs = self.get_values('project/other_research_output/fair')
+
+        para.add_run("The following aspects are relevant and will be considered within the project:\n")
+        para.add_run(render_as_list(outputs))
+
+
+    def _a34(self, context: _Context, para: Paragraph) -> None:
+        """
+        What will the costs be for making data or other research outputs FAIR in your project
+	    (e.g. direct and indirect costs related to storage, archiving, re-use, security, etc.)?
+        """
+        def render_value(identifier:str)->str:
+            v = self.get_value(identifier)
+            return v if v is not None else ""
+
+        para.add_run(f"For metadata: { render_value('project/costs/metadata/personnel') }; { render_value ('project/costs/metadata/non_personnel') }\n")
+        para.add_run(f"For PIDs: { render_value ('project/costs/pid/personnel') }; { render_value ('project/costs/pid/non_personnel') }\n")
+        para.add_run(f"For data preservation: { render_value ('project/costs/preservation/personnel') }; { render_value ('project/costs/preservation/non_personnel')} \n")
+        para.add_run(f"For management of other research outputs: { render_value ('project/costs/other_research_output/personnel') }; { render_value ('project/costs/other_research_output/non_personnel') }")
+
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -579,11 +619,11 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer28}}"      : "The data will be available for re-use, as far as reported in question 21.",
                 "{{Answer29}}"      : self._dataset_database_value("project/dataset/provenance/standards"),
                 "{{Answer30}}"      : self._a30,
-                "{{Answer31}}"     : "We will address these aspects in the following section",
-                "{{Answer32}}"      : self._stub,
-                "{{Answer33}}"      : self._stub,
-                "{{Answer34}}"      : self._stub,
-                "{{Answer35}}"      : self._stub,
+                "{{Answer31}}"      : "We will address these aspects in the following section",
+                "{{Answer32}}"      : self._a32,
+                "{{Answer33}}"      : self._a33,
+                "{{Answer34}}"      : self._a34,
+                "{{Answer35}}"      : self.get_text('project/costs/preservation/cover_how'),
                 "{{Answer36}}"      : self._stub,
                 "{{Answer37}}"      : self._stub,
                 "{{Answer38a}}"     : self._stub,
