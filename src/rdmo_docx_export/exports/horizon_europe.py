@@ -524,6 +524,24 @@ class HorizonEuropeDocxExport(Export):
         para.add_run(f"For data preservation: { render_value ('project/costs/preservation/personnel') }; { render_value ('project/costs/preservation/non_personnel')} \n")
         para.add_run(f"For management of other research outputs: { render_value ('project/costs/other_research_output/personnel') }; { render_value ('project/costs/other_research_output/non_personnel') }")
 
+    def _a36(self, context: _Context, para: Paragraph) -> None:
+        """
+        Describe all relevant data quality assurance processes.
+        """
+        first = True
+        for partner in context.partners:
+            responsible = self.get_values('project/partner/contact_person/name', set_index=partner.set_index)
+
+            if not has_value(partner):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"{partner.value}: ")
+            headline.italic = True
+            para.add_run(", ".join(r.value for r in responsible))
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -624,10 +642,9 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer33}}"      : self._a33,
                 "{{Answer34}}"      : self._a34,
                 "{{Answer35}}"      : self.get_text('project/costs/preservation/cover_how'),
-                "{{Answer36}}"      : self._stub,
+                "{{Answer36}}"      : self._a36,
                 "{{Answer37}}"      : self._stub,
-                "{{Answer38a}}"     : self._stub,
-                "{{Answer38b}}"     : self._stub,
+                "{{Answer38}}"      : self._stub,
                 "{{Answer39}}"      : self._stub,
                 "{{Answer40}}"      : self._stub,
                 "{{Answer41}}"      : self._stub,
