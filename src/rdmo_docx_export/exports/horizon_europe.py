@@ -599,7 +599,48 @@ class HorizonEuropeDocxExport(Export):
             headline.italic = True
             para.add_run(purpose.value)
 
+    def _a38(self, context: _Context, para: Paragraph) -> None:
+        """
+        What provisions are or will be in place for data security (including data recovery as well as secure storage/archiving and transfer of sensitive data)?
+        """
+        first = True
+        for dataset in context.datasets:
+            security = self.get_values('project/dataset/data_security/security_measures', set_index=dataset.set_index)
 
+            if not has_value(security):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(render_as_list(security))
+
+    def _a39(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will the data be safely stored in trusted repositories for long-term preservation and curation?
+        """
+        para.add_run("Yes, the chosen repositories are trustworthy. See question 11 for further details.\n\n")
+
+        first = True
+        for dataset in context.datasets:
+            security = self.get_values('project/dataset/preservation/repository', set_index=dataset.set_index)
+            certified = self.get_bool('project/dataset/preservation/certification', set_index=dataset.set_index)
+
+            if not has_value(security):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(", ".join(s.value for s in security))
+            if certified is not None:
+                para.add_run("(certified)" if certified.value else "(not certified)")
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -702,8 +743,8 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer35}}"      : self.get_text('project/costs/preservation/cover_how'),
                 "{{Answer36}}"      : self._a36,
                 "{{Answer37}}"      : self._a37,
-                "{{Answer38}}"      : self._stub,
-                "{{Answer39}}"      : self._stub,
+                "{{Answer38}}"      : self._a38,
+                "{{Answer39}}"      : self._a39,
                 "{{Answer40}}"      : self._stub,
                 "{{Answer41}}"      : self._stub,
                 "{{Answer42}}"      : self._stub,
