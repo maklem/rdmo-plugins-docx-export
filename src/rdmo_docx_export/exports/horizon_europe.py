@@ -543,6 +543,64 @@ class HorizonEuropeDocxExport(Export):
             headline.italic = True
             para.add_run(", ".join(r.value for r in responsible))
 
+    def _a37(self, context: _Context, para: Paragraph) -> None:
+        """
+        How will long term preservation be ensured? Discuss the necessary resources to accomplish this
+	    (costs and potential value, who decides and how, what data will be kept and for how long).
+        """
+        part_duration = para.add_run("Duration of preservation\n")
+        part_duration.bold = True
+        for dataset in context.datasets:
+            duration = self.get_value('project/dataset/preservation/duration', set_index=dataset.set_index)
+
+            if not has_value(duration):
+                continue
+
+            headline = para.add_run(f"{dataset.value}: ")
+            headline.italic = True
+            para.add_run(duration.value + "\n")
+        para.add_run("\n")
+
+        part_costs = para.add_run("Costs\n")
+        part_costs.bold = True
+        para.add_run("See question 34.\n\n")
+
+        part_Potential_value = para.add_run("Potential value\n")
+        part_Potential_value.bold = True
+        para.add_run("See question 6.\n\n")
+
+        responsible = self.get_value('project/preservation/responsible_person/name')
+        if has_value(responsible):
+            part_responsible = para.add_run("Preservation decisions\n")
+            part_responsible.bold = True
+            para.add_run(f"All decision related to preservation fall under the responsibility of { responsible.value }.\n\n")
+
+        criteria = self.get_values('project/preservation/selection_criteria')
+        part_criteria = para.add_run("Criteria for preservation\n")
+        part_criteria.bold = True
+        para.add_run(", ".join(c.value for c in criteria))
+        para.add_run("\n\n")
+
+        part_motivation = para.add_run("Motivation for long-term preservation\n")
+        part_motivation.bold = True
+
+        first = True
+        for dataset in context.datasets:
+            purpose = self.get_value('project/dataset/preservation/purpose', set_index=dataset.set_index)
+
+            if not has_value(purpose):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"{dataset.value}: ")
+            headline.italic = True
+            para.add_run(purpose.value)
+
+
+
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
         Checks if a paragraph's content is to be replaced.
@@ -643,7 +701,7 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer34}}"      : self._a34,
                 "{{Answer35}}"      : self.get_text('project/costs/preservation/cover_how'),
                 "{{Answer36}}"      : self._a36,
-                "{{Answer37}}"      : self._stub,
+                "{{Answer37}}"      : self._a37,
                 "{{Answer38}}"      : self._stub,
                 "{{Answer39}}"      : self._stub,
                 "{{Answer40}}"      : self._stub,
