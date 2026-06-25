@@ -726,6 +726,63 @@ class HorizonEuropeDocxExport(Export):
 
         para.add_run("\n\nSee question 17 and the following question for further details.")
 
+    def _a41(self, context: _Context, para: Paragraph) -> None:
+        """
+        Will informed consent for data sharing and long term preservation be included in questionnaires dealing with personal data?
+        """
+
+        first = True
+        for dataset in context.datasets:
+            extent = self.get_value('project/dataset/sensitive_data/personal_data/consent/extent', set_index=dataset.set_index)
+            statement = self.get_value('project/dataset/sensitive_data/personal_data/consent/statement', set_index=dataset.set_index)
+
+            if not has_value(extent):
+                continue
+
+            if not first:
+                para.add_run("\n").add_break()
+            first = False
+
+            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline.italic = True
+            para.add_run(extent.value + ".")
+            if has_value(statement):
+                para.add_run(statement.value + ".")
+
+    def _a42(self, context: _Context, para: Paragraph) -> None:
+        """
+        Do you, or will you, make use of other national/funder/sectorial/departmental procedures for data management?
+        If yes, which ones? (Please list and briefly describe them.)
+        """
+
+        part_criteria = para.add_run("Regulations of the funder")
+        part_criteria.bold = True
+        policy = self.get_value('project/funder/rdm_policy')
+        if has_value(policy):
+            para.add_run(f"\n{policy.value}")
+
+        part_criteria = para.add_run("\n\nRegulations of the involved partner institutions")
+        part_criteria.bold = True
+
+        for partner in context.partners:
+            headline = para.add_run(f"\nDataset {partner.value}:\n")
+            headline.italic = True
+            partner_policy = self.get_values('project/partner/rdm_policy', set_index=partner.set_index)
+
+            para.add_run(render_as_list( partner_policy))
+
+        org_policies = self.get_values('project/dataset/storage/organisation_policy')
+        if has_value(org_policies):
+            part_criteria = para.add_run("\n\nProject-internal regulations\n")
+            part_criteria.bold = True
+            para.add_run(render_as_list(org_policies))
+
+        other_policies = self.get_values('project/additional_rdm_policy/requirements')
+        if has_value(other_policies):
+            part_criteria = para.add_run("\n\nOther regulations\n")
+            part_criteria.bold = True
+            para.add_run(render_as_list(other_policies))
+
 
     def _replace_paragraph_contents(self, replacements: _Replacements, context: _Context, para: Paragraph):
         """
@@ -831,8 +888,8 @@ class HorizonEuropeDocxExport(Export):
                 "{{Answer38}}"      : self._a38,
                 "{{Answer39}}"      : self._a39,
                 "{{Answer40}}"      : self._a40,
-                "{{Answer41}}"      : self._stub,
-                "{{Answer42}}"      : self._stub,
+                "{{Answer41}}"      : self._a41,
+                "{{Answer42}}"      : self._a42,
             }
 
             for para in doc.paragraphs:
