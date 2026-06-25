@@ -227,11 +227,10 @@ class HorizonEuropeDocxExport(Export):
 
             if not first:
                 para.add_run("\n\n")
-                first = False
+            first = False
 
-            headline = para.add_run(f"Dataset {dataset.value}: ")
+            headline = para.add_run(f"Dataset {dataset.value}:\n")
             headline.italic = True
-            headline.add_break()
             para.add_run(render_as_list(pids))
 
     def _a8(self, context: _Context, para: Paragraph) -> None:
@@ -517,12 +516,12 @@ class HorizonEuropeDocxExport(Export):
         """
         def render_value(identifier:str)->str:
             v = self.get_value(identifier)
-            return v if v is not None else ""
+            return v.value if v is not None else ""
 
-        para.add_run(f"For metadata: { render_value('project/costs/metadata/personnel') }; { render_value ('project/costs/metadata/non_personnel') }\n")
-        para.add_run(f"For PIDs: { render_value ('project/costs/pid/personnel') }; { render_value ('project/costs/pid/non_personnel') }\n")
-        para.add_run(f"For data preservation: { render_value ('project/costs/preservation/personnel') }; { render_value ('project/costs/preservation/non_personnel')} \n")
-        para.add_run(f"For management of other research outputs: { render_value ('project/costs/other_research_output/personnel') }; { render_value ('project/costs/other_research_output/non_personnel') }")
+        para.add_run(f"For metadata: { render_value('project/costs/metadata/personnel') } PM; { render_value ('project/costs/metadata/non_personnel') } €\n")
+        para.add_run(f"For PIDs: { render_value ('project/costs/pid/personnel') } PM; { render_value ('project/costs/pid/non_personnel') } €\n")
+        para.add_run(f"For data preservation: { render_value ('project/costs/preservation/personnel') } PM; { render_value ('project/costs/preservation/non_personnel')} €\n")
+        para.add_run(f"For management of other research outputs: { render_value ('project/costs/other_research_output/personnel') } PM; { render_value ('project/costs/other_research_output/non_personnel') } €")
 
     def _a36(self, context: _Context, para: Paragraph) -> None:
         """
@@ -640,7 +639,7 @@ class HorizonEuropeDocxExport(Export):
             headline.italic = True
             para.add_run(", ".join(s.value for s in security))
             if certified is not None:
-                para.add_run("(certified)" if certified.value else "(not certified)")
+                para.add_run("(certified)" if certified else "(not certified)")
 
     def _a40(self, context: _Context, para: Paragraph) -> None:
         """
@@ -652,7 +651,7 @@ class HorizonEuropeDocxExport(Export):
         for dataset in context.datasets:
             sensitive = self.get_bool('project/dataset/sensitive_data/personal_data_yesno/yesno', set_index=dataset.set_index)
 
-            if sensitive is None or not sensitive:
+            if not sensitive:
                 continue
 
             identifying = self.get_bool('project/dataset/sensitive_data/personal_data/bdsg_3_9', set_index=dataset.set_index)
@@ -689,7 +688,7 @@ class HorizonEuropeDocxExport(Export):
             para.add_run(f"\nThe research has been { committee.value }.")
 
         statutatory= self.get_bool('project/legal_aspects/official_approval/statutatory_approval/yesno')
-        if has_value(statutatory) and statutatory.value:
+        if statutatory:
             title = self.get_value('project/legal_aspects/official_approval/statutatory_approval/title')
             agency = self.get_value('project/legal_aspects/official_approval/statutatory_approval/agency')
             if has_value(title) or has_value(agency):
@@ -707,15 +706,15 @@ class HorizonEuropeDocxExport(Export):
         for dataset in context.datasets:
             sensitive = self.get_bool('project/legal_aspects/ipr/yesno', set_index=dataset.set_index)
 
-            if not has_value(sensitive) or not sensitive:
+            if not sensitive:
                 continue
 
             if not first:
                 para.add_run("\n")
             first = False
 
-            copyright = self.get_bool('project/legal_aspects/ipr/copyrights', set_index=dataset.set_index)
-            other_right = self.get_bool('project/legal_aspects/ipr/other_rights', set_index=dataset.set_index)
+            copyright = self.get_value('project/legal_aspects/ipr/copyrights', set_index=dataset.set_index)
+            other_right = self.get_value('project/legal_aspects/ipr/other_rights', set_index=dataset.set_index)
 
             headline = para.add_run(f"\nDataset {dataset.value}:")
             headline.italic = True
