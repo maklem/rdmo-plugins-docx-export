@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import datetime
 from importlib import resources
 import io
 import logging
@@ -69,6 +70,8 @@ def has_value(query_response: Value | ValueQuerySet | None) -> bool:
         return False
     if isinstance(query_response, ValueQuerySet):
         return len(query_response) > 0
+    if isinstance(query_response.value, datetime.date):
+        return True
     return len(query_response.value.strip()) > 0
 
 def render_as_list(values: ValueQuerySet) -> str:
@@ -764,11 +767,11 @@ class HorizonEuropeDocxExport(Export):
         part_criteria.bold = True
 
         for partner in context.partners:
-            headline = para.add_run(f"\nDataset {partner.value}:\n")
+            headline = para.add_run(f"\n{partner.value}:\n")
             headline.italic = True
             partner_policy = self.get_values('project/partner/rdm_policy', set_index=partner.set_index)
 
-            para.add_run(render_as_list( partner_policy))
+            para.add_run(render_as_list(partner_policy))
 
         org_policies = self.get_values('project/dataset/storage/organisation_policy')
         if has_value(org_policies):
